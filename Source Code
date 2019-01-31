@@ -1,0 +1,205 @@
+#module to generate all combinations excluding 'detach'
+#from generate_combinations import *
+#module to handle mapping strings <-> arrays
+#from helper_functions import * 
+#module to read and preprocess raw data
+#Preprocess in is Python..... How to connect the two? (Should be easy both in Python)
+
+from preprocess import * 
+
+#standard module
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+
+# import sklearn
+#linear_model is imported so that the linear regression feature can be used later to find trends in the stress and strain
+
+from sklearn import linear_model
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn import neighbors
+from sklearn.metrics import f1_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import accuracy_score
+from scipy.spatial.distance import squareform
+from scipy.stats import rankdata
+from matplotlib.backends.backend_pdf import PdfPages
+from sklearn.neural_network import MLPRegressor
+
+sns.set_context("paper", font_scale=1.5, rc={"lines.linewidth": 2.5})
+
+
+
+
+alldata_15G=np.loadtxt('15grid_shuffled.dat')
+alldata = alldata_15G
+
+
+
+alldata[0]
+
+
+
+
+def linear_models_with_regularizations(X_train, X_test, y_train, y_test, alpha_ridge,  alpha_lasso):
+    """
+    Parameters
+    --------------
+    X_train, X_test: numpy matrix 
+    y_train, y_test: numpy array
+    
+    ridge: boolean
+        set ridge = True for including Ridge regression
+        
+    Return: float
+        r2_score 
+    """
+    logTrans = False 
+    
+    if logTrans is True:
+        y_test = np.log(y_test)
+        y_train = np.log(y_train)
+        
+    
+    regr = linear_model.LinearRegression()
+    regr.fit(X_train, y_train)
+    y_pred_regr = regr.predict(X_test)
+    #accuracy_score(Y_test, Y_pred)
+    # The coefficients
+    #print('Coefficients: \n', regr.coef_)
+    print("Mean squared error Linear Regression: %.2f" % mean_squared_error(y_test, y_pred_regr))
+    # Explained variance score: 1 is perfect prediction
+    #ac1 = r2_score(y_test, y_pred)
+    print("RMSE: %lf" %np.sqrt(np.sum(np.square(y_test-y_pred_regr))/len(y_test)))
+    print('r2_score: %.2f' % r2_score(y_test, y_pred_regr))
+    ysorted= np.sort(y_test)  
+    xx = np.linspace(ysorted[0], ysorted[-1], len(ysorted))
+    plt.plot(xx, xx, 'r')  
+    
+    plt.plot(y_pred_regr, y_test, 'bo', alpha=0.5)
+    plt.xlabel('Predicted yield stress') #change the name here stress/strain
+    plt.ylabel('True yield stress')
+    plt.title('OLS with polynomial degree=2')
+    #plt.ylim(0, 1.2)
+    #plt.xlim(0, 1.2)
+    #plt.show()
+    #yy = y_test.reshape((len(y_test), 1))    
+        
+    
+    ridge = linear_model.Ridge(alpha=alpha_ridge)
+    ridge.fit(X_train, y_train)
+    y_pred_ridge=ridge.predict(X_test)
+    #accuracy_score(Y_test, Y_pred)
+    # The coefficients
+    #print('Coefficients: \n', clf.coef_)
+    print("Mean squared error Ridge Regression: %.2f" % mean_squared_error(y_test, y_pred_ridge))
+    # Explained variance score: 1 is perfect prediction
+    print("RMSE: %lf" %np.sqrt(np.sum(np.square(y_test-y_pred_ridge))/len(y_test)))
+    print('r2_score: %.2f' % r2_score(y_test, y_pred_ridge))
+    #ac_ridge = r2_score(y_test, y_pred)
+    #plt.plot(y_pred, y_test, 'bo', alpha=0.5)
+    #plt.xlabel('y_test (fracture strain)')
+    #plt.ylabel('y_pred (fracture strain)')
+    #plt.title('Ridge Regression')
+    plt.show()
+    
+    lasso = linear_model.Lasso(alpha=alpha_lasso)
+    lasso.fit(X_train, y_train)
+    y_pred_lasso=lasso.predict(X_test)
+    #accuracy_score(Y_test, Y_pred)
+    # The coefficients
+    #print('Coefficients: \n', clf.coef_)
+    #print("Mean squared error: %.2f" % mean_squared_error(y_test, y_pred_lasso))
+    # Explained variance score: 1 is perfect prediction
+    #print('r2_score: %.2f' % r2_score(y_test, y_pred_lasso))
+    #ac_lasso = r2_score(y_test, y_pred)
+    #plt.plot(y_test, y_pred, 'o')
+    #plt.xlabel('y_test (fracture strain)')
+    #plt.ylabel('y_pred (fracture strain)')
+    #plt.title('LASSO Regression')
+    #plt.show()
+    
+    
+        
+    return y_pred_regr, y_pred_ridge, y_pred_lasso, regr.coef_, ridge.coef_, lasso.coef_
+    
+    
+    
+    
+    #split data into training and test set
+sns.set_context("paper", font_scale=1.5, rc={"lines.linewidth": .5})
+#np.random.shuffle(alldata) 
+x, y=create_matrix(alldata, False, 2, 0.3, 15)
+x = (x-.5)*2
+X_train, X_valid, X_test, y_train, y_valid, y_test = split_data(x, y, 0.8, 0.2)
+#choose polynomial degrees
+poly = PolynomialFeatures(2, interaction_only=True, include_bias=True)
+#poly = PolynomialFeatures(2)
+
+X_train2 = poly.fit_transform(X_train)
+print("Number of features: %d" %len(X_train2[0]))
+X_test2 = poly.fit_transform(X_test)
+#linear_models(X_train2, X_test2, y_train, y_test, ridge=True)
+#y_train = (y_train-0.45937603178269587)/0.22056868516982353
+#y_test = (y_test-0.45937603178269587)/0.22056868516982353
+alpha=0.1
+y_pred_regr, y_pred_ridge, y_pred_lasso, coef_regr, coef_ridge, coef_lasso = linear_models_with_regularizations(X_train2, X_test2, y_train, y_test, 10, 0.1)
+
+
+
+
+
+def NN_regressor(alldata, hl, obj):
+    nn_regr = MLPRegressor(solver='lbfgs', alpha=1e-5, hidden_layer_sizes=hl, activation='relu', random_state=1)
+    #sorted_data = alldata[alldata[:,15].argsort()] #index 18 prob bad design, small -> goode design
+    np.random.shuffle(alldata) 
+    #0nly fit top 20%
+    #sorted_data = sorted_data[int(0.8*len(sorted_data)):]
+
+
+    #np.random.shuffle(sorted_data) 
+    #cutoff = sorted_data[int(len(alldata)/2), 17]
+    #x, y=create_matrix(sorted_data, True, 2, 30, NCcell_x*NCcell_y)
+    x, y=create_matrix(alldata, False, obj, 0.375, 15)
+    X_train, X_valid, X_test, y_train, y_valid, y_test = split_data(x, y, 0.8, 0.2)
+    poly = PolynomialFeatures(1, interaction_only=True, include_bias=False)
+    #poly = PolynomialFeatures(interaction_only=True)
+    X_train2 = poly.fit_transform(X_train)
+    x2 = poly.fit_transform(x)
+
+    #print("Number of features: %d" %len(X_train2[0]))
+    X_test2 = poly.fit_transform(X_test)
+
+
+    nn_regr.fit(X_train2, y_train)
+    y_pred_nn= nn_regr.predict(X_test2)
+    
+    ysorted= np.sort(y_test)  
+    xx = np.linspace(ysorted[0], ysorted[-1], len(ysorted))
+    plt.plot(xx, xx, 'r')  
+    
+    plt.plot(y_pred_nn, y_test, 'bo', alpha=0.5)
+    plt.xlabel('Predicted yield stress')
+    plt.ylabel('True yield strain')
+    plt.title('Neural Network')
+
+    print("Mean squared error: %lf" % mean_squared_error(y_test, y_pred_nn))
+    print("RMSE: %lf" %np.sqrt(np.sum(np.square(y_test-y_pred_nn))/len(y_test)))
+    # Explained variance score: 1 is perfect prediction
+    print('r2_score: %.2f' % r2_score(y_test, y_pred_nn))
+    return hl[0], np.sqrt(np.sum(np.square(y_test-y_pred_nn))/len(y_test)), r2_score(y_test, y_pred_nn), y_test, y_pred_nn
+    
+    
+    
+    
+    hl, rmse, ac, y_test, y_pred=NN_regressor(alldata, (8,), 0)
+    
+    
+    
+    
+    
+
+
